@@ -3,10 +3,17 @@ var rl = require('readline');
 var command = require('./command');
 
 var s = net.createServer(function(so) {
+	var record = so.remoteAddress + ':' + so.remotePort;
+
+    console.log('[server] Connected: ', record);
 
 	so.write('220 (nodejs ftp v0.0)\r\n');
 	so.app = { user : '-', pass : '-', cwd : '/', vroot : 'e:/'};
 	so.app.config = { data_port : 8889 };
+
+	so.on('error', function(err) {
+		console.log('err:', err);
+	});
 
 	rl.createInterface({
 		input : so,
@@ -28,5 +35,5 @@ var s = net.createServer(function(so) {
 	}).on('error', function(e) {
 		console.log('error' + e);
 	});
-}).listen(8888);
+}).listen(6666);
 

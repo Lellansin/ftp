@@ -77,71 +77,13 @@ command.pasv = function(so, args) {
 
 command.list = function(so, args) {
 	if (!so.app.di) {
-		console.log('error');
+		console.log('error di no exsit');
 		return;
 	}
 
 	so.write('150 Here comes the directory listing.\r\n');
 	// list directory
-	var fileList = function(dir) {
-		console.log('listing directory :' + dir);
-		var line = '';
-		var stat;
-		fs.readdirSync(dir).forEach(function(f) {
-			try {
-				stat = fs.lstatSync(path.join(dir, f));
-			} catch (e) {
-				console.log('list:' + e);
-				return;
-			}
-			// file type
-			if (stat.isFile()) {
-				line += '-';
-			} else if (stat.isDirectory()) {
-				line += 'd';
-			} else if (stat.isBlockDevice()) {
-				line += 'b';
-			} else if (stat.isCharacterDevice()) {
-				line += 'c';
-			} else if (stat.isSymbolicLink()) {
-				line += 'l';
-			} else if (stat.isFIFO()) {
-				line += 'f';
-			} else if (stat.isSocket()) {
-				line += 's';
-			}
-			// file mode
-			var mask = {
-				00: '---',
-				02: '-w-',
-				01: '--x',
-				03: '-wx',
-				06: 'rw-',
-				05: 'r-x',
-				07: 'rwx',
-			};
-			line += mask[stat.mode >> 16 & 0xF];
-			line += mask[stat.mode >> 8 & 0xF];
-			line += mask[stat.mode & 0xF];
-			line += ' ';
-			// node link
-			line += stat.nlink + ' ';
-			// user, group
-			line += stat.uid + ' ' + stat.gid + ' ';
-			// size
-			line += stat.size + ' ';
-			// date 
-			line += [
-				'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-				'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-			][stat.mtime.month] + ' ' + stat.mtime.day + ' ';
-			// time
-			line += stat.mtime.hour + ':' + stat.mtime.minute + ' ';
-			// filename
-			line += f + '\n';
-		});
-		return line;
-	}(path.join(so.app.vroot, so.app.cwd), '');
+	var fileList = getFileList(path.join(so.app.vroot, so.app.cwd), '');
 	// end list directory
 	so.app.di.write(fileList, function(err) {
 		if (!err) {
@@ -154,27 +96,34 @@ command.list = function(so, args) {
 };
 
 command.retr = function(so, filename) {
+	var src = path.join(so.app.vroot, so.app.cwd, filename);
+	console.log('src:', src);
 	try {
-		var size = fs.lstatSync(path.join(so.app.vroot, filename)).size;
+		var size = fs.lstatSync(src).size;
+		console.log('size:', size);
 		so.write('150 Opening BINARY mode data connection for ' +
-			path.join(so.app.vroot, filename) + '(' + size + ' bytes)\r\n');
+			src + '(' + size + ' bytes)\r\n');
 	} catch (e) {
 		console.log(e);
 	}
 
-	var fin = fs.createReadStream(path.join(so.app.vroot, filename));
-	so.on('drain', function() {
-		fin.resume();
-	});
-	fin.on('data', function(data) {
-		if (!so.app.di.write(data)) {
-			fin.pause();
-		}
-	}).on('end', function() {
-		so.write('226 Transfer complete.\r\n');
-		so.app.di.end();
-		so.app.di = null;
-	});
+	var server = so.app.dil;
+	server.on('connection', function(conn) {
+		var fin = fs.createReadStream(src);
+		so.on('drain', function() {
+			fin.resume();
+		});
+		fin.on('data', function(data) {
+			if (!conn.write(data)) {
+				fin.pause();
+			}
+		}).on('end', function() {
+			so.write('226 Transfer complete.\r\n');
+			if (!!conn) {
+				conn.end();
+			}
+		});
+	})
 };
 
 command.stor = function(so, args) {
@@ -223,3 +172,63 @@ command.unknown = function(so, args) {
 };
 
 module.exports = command;
+
+var getFileList = function(dir) {
+	console.log('listing directory :' + dir);
+	var line = '';
+	var stat;
+	fs.readdirSync(dir).forEach(function(f) {
+		try {
+			stat = fs.lstatSync(path.join(dir, f));
+		} catch (e) {
+			console.log('getFileList error:' + e);
+			return;
+		}
+		// file type
+		if (stat.isFile()) {
+			line += '-';
+		} else if (stat.isDirectory()) {
+			line += 'd';
+		} else if (stat.isBlockDevice()) {
+			line += 'b';
+		} else if (stat.isCharacterDevice()) {
+			line += 'c';
+		} else if (stat.isSymbolicLink()) {
+			line += 'l';
+		} else if (stat.isFIFO()) {
+			line += 'f';
+		} else if (stat.isSocket()) {
+			line += 's';
+		}
+		// file mode
+		var mask = {
+			00: '---',
+			02: '-w-',
+			01: '--x',
+			03: '-wx',
+			06: 'rw-',
+			05: 'r-x',
+			07: 'rwx',
+		};
+		line += mask[stat.mode >> 16 & 0xF];
+		line += mask[stat.mode >> 8 & 0xF];
+		line += mask[stat.mode & 0xF];
+		line += ' ';
+		// node link
+		line += stat.nlink + ' ';
+		// user, group
+		line += stat.uid + ' ' + stat.gid + ' ';
+		// size
+		line += stat.size + ' ';
+		// date 
+		line += [
+			'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+			'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+		][stat.mtime.month] + ' ' + stat.mtime.day + ' ';
+		// time
+		line += stat.mtime.hour + ':' + stat.mtime.minute + ' ';
+		// filename
+		line += f + '\n';
+	});
+	return line;
+};
