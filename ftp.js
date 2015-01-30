@@ -15,6 +15,10 @@ var s = net.createServer(function(so) {
 		console.log('err:', err);
 	});
 
+	so.on('end', function(err) {
+		console.log('[server] Disconnected: ', record);
+	}.bind({record: record}));
+
 	rl.createInterface({
 		input : so,
 		output : so
