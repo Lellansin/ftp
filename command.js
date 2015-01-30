@@ -1,6 +1,7 @@
 var fs = require('fs');
 var net = require('net');
 var path = require('path');
+var CONST = require('./config/const');
 
 function command() {
 
@@ -103,12 +104,15 @@ command.retr = function(so, filename) {
 		console.log('size:', size);
 		so.write('150 Opening BINARY mode data connection for ' +
 			src + '(' + size + ' bytes)\r\n');
-	} catch (e) {
-		console.log(e);
+	} catch (err) {
+		console.log('err', err);
 	}
 
 	var server = so.app.dil;
 	server.on('connection', function(conn) {
+		var record = conn.remoteAddress + ':' + conn.remotePort;
+		console.log('[dil] Connected: ', record);
+		
 		var fin = fs.createReadStream(src);
 		so.on('drain', function() {
 			fin.resume();
@@ -184,6 +188,7 @@ var getFileList = function(dir) {
 			console.log('getFileList error:' + e);
 			return;
 		}
+
 		// file type
 		if (stat.isFile()) {
 			line += '-';
@@ -200,35 +205,34 @@ var getFileList = function(dir) {
 		} else if (stat.isSocket()) {
 			line += 's';
 		}
+
 		// file mode
-		var mask = {
-			00: '---',
-			02: '-w-',
-			01: '--x',
-			03: '-wx',
-			06: 'rw-',
-			05: 'r-x',
-			07: 'rwx',
-		};
-		line += mask[stat.mode >> 16 & 0xF];
-		line += mask[stat.mode >> 8 & 0xF];
-		line += mask[stat.mode & 0xF];
+		line += CONST.MASK[stat.mode >> 16 & 0xF];
+		line += CONST.MASK[stat.mode >> 8 & 0xF];
+		line += CONST.MASK[stat.mode & 0xF];
 		line += ' ';
+
 		// node link
 		line += stat.nlink + ' ';
+
 		// user, group
 		line += stat.uid + ' ' + stat.gid + ' ';
+
 		// size
 		line += stat.size + ' ';
-		// date 
-		line += [
-			'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-			'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-		][stat.mtime.month] + ' ' + stat.mtime.day + ' ';
-		// time
-		line += stat.mtime.hour + ':' + stat.mtime.minute + ' ';
+
+		// datetime 
+		line += getTimeString(stat.mtime);
+
 		// filename
 		line += f + '\n';
 	});
-	return line;
+	// console.log('line:', line);
+	return new Buffer(line);
+};
+
+var getTimeString = function(time) {
+	var result = CONST.MONTH[time.getMonth()] + ' ' + time.getDay() + ' ';
+	result += time.getHours() + ':' + time.getMinutes() + ' ';
+	return result;
 };
