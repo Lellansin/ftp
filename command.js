@@ -42,10 +42,10 @@ command.rest = function(so, args) {
 command.type = function(so, args) {
 	var mode = 'binary';
 	if ('A' === args) {
-		console.log('transfer buffer type');
+		console.log('transfer buffer type ASCII');
 		so.type = 'ASCII';
 	} else if('B' === args) {
-		console.log('transfer buffer type');
+		console.log('transfer buffer type BINARY');
 		so.type = 'BINARY';
 	}
 	so.write('200 Switch to ' + mode + ' OK\r\n');
@@ -69,8 +69,8 @@ command.pasv = function(so, args) {
 	if (!so.app.dil) {
 		so.app.dil = net.createServer(function(conn) {
 			so.app.di = conn;
-		}).on('error', function(e) {
-			console.log(e);
+		}).on('error', function(err) {
+			console.error(err);
 		}).listen(so.app.config.data_port);
 	}
 	var port = parseInt(so.app.config.data_port);
@@ -82,7 +82,7 @@ command.pasv = function(so, args) {
 
 command.list = function(so, args) {
 	if (!so.app.di) {
-		console.log('error di no exsit');
+		console.error('error di no exsit');
 		return;
 	}
 
@@ -109,7 +109,7 @@ command.retr = function(so, filename) {
 		so.write('150 Opening BINARY mode data connection for ' +
 			src + '(' + size + ' bytes)\r\n');
 	} catch (err) {
-		console.log('err', err);
+		console.error('err', err);
 	}
 
 	var server = so.app.dil;
@@ -149,8 +149,8 @@ command.stor = function(so, args) {
 		so.app.di.end();
 		so.app.di = null;
 		so.write('226 Transfer complete.\r\n');
-	}).on('error', function(e) {
-		console.log(e);
+	}).on('error', function(err) {
+		console.error(err);
 	});
 };
 

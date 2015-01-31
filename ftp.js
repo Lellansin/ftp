@@ -20,7 +20,7 @@ var server = net.createServer(function(so) {
 	};
 
 	so.on('error', function(err) {
-		log.info('err:', err);
+		log.error('err:', err);
 	});
 
 	so.on('end', function(err) {
@@ -37,7 +37,7 @@ var server = net.createServer(function(so) {
 		var words = line.split(' ');
 		var cmd = words[0].toLowerCase();
 		var args = words.slice(1).join(' ');
-		log.info('[' + cmd + '][' + args + ']');
+		log.debug('[' + cmd + '][' + args + ']');
 
 		if (command[cmd]) {
 			command[cmd](so, args);
