@@ -42,7 +42,11 @@ command.rest = function(so, args) {
 command.type = function(so, args) {
 	var mode = 'binary';
 	if ('A' === args) {
-		ret = 'ASCII';
+		console.log('transfer buffer type');
+		so.type = 'ASCII';
+	} else if('B' === args) {
+		console.log('transfer buffer type');
+		so.type = 'BINARY';
 	}
 	so.write('200 Switch to ' + mode + ' OK\r\n');
 };
