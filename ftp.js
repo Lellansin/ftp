@@ -9,22 +9,14 @@ var server = net.createServer(function(so) {
 	log.info('Connected: ', record);
 
 	so.write('220 (nodejs ftp v0.0)\r\n');
-	so.app = {
-		user: '-',
-		pass: '-',
-		cwd: '/',
-		vroot: 'e:/'
-	};
-	so.app.config = {
-		data_port: 8889
-	};
+	newUser(so);
 
 	so.on('error', function(err) {
-		log.error('err:', err);
+		log.error('Socket err:', err);
 	});
 
-	so.on('end', function(err) {
-		log.info('Disconnected: ', record);
+	so.on('end', function() {
+		log.info('Disconnected: ', this.record);
 	}.bind({
 		record: record
 	}));
@@ -58,3 +50,19 @@ server.on('error', function(err) {
 server.listen(6666, function() {
 	log.info('server start listen.');
 });
+
+var id = 1;
+
+var newUser = function(so) {
+	so.app = {
+		sid: id++,
+		user: '-',
+		pass: '-',
+		cwd: '/',
+		vroot: 'e:/'
+	};
+
+	so.app.config = {
+		data_port: 8888 + id
+	};
+};

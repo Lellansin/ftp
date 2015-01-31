@@ -17,6 +17,12 @@ command.pass = function(so, args) {
 	so.write('230 Login successful.\r\n');
 };
 
+// todo
+// command.quit = function(so, args) {
+	// so.app.pass = args;
+	// so.write('230 Login successful.\r\n');
+// };
+
 command.syst = function(so, args) {
 	so.write('215 Unix cj\r\n');
 };
@@ -44,7 +50,7 @@ command.type = function(so, args) {
 	if ('A' === args) {
 		console.log('transfer buffer type ASCII');
 		so.type = 'ASCII';
-	} else if('B' === args) {
+	} else if ('B' === args) {
 		console.log('transfer buffer type BINARY');
 		so.type = 'BINARY';
 	}
@@ -66,18 +72,25 @@ command.cdup = function(so) {
 };
 
 command.pasv = function(so, args) {
-	if (!so.app.dil) {
-		so.app.dil = net.createServer(function(conn) {
-			so.app.di = conn;
-		}).on('error', function(err) {
-			console.error(err);
-		}).listen(so.app.config.data_port);
-	}
 	var port = parseInt(so.app.config.data_port);
 	var hl = (port >> 8) & 0xFF;
 	var lo = (port & 0xFF);
 	var addr = '127,0,0,1,' + hl + ',' + lo;
-	so.write('227 Entering Passive Mode (' + addr + ')\r\n');
+
+	if (!so.app.dil) {
+		so.app.dil = net.createServer(function(conn) {
+			so.app.di = conn;
+		}).on('error', function(err) {
+			console.error('pasv', err);
+		}).on('end', function() {
+			console.error('pasv dil closed');
+		}).listen(so.app.config.data_port, function() {
+			console.debug('pasv dil listen port', port, 'addr', addr);
+			so.write('227 Entering Passive Mode (' + addr + ')\r\n');
+		});
+	} else {
+		so.write('227 Entering Passive Mode (' + addr + ')\r\n');
+	}
 };
 
 command.list = function(so, args) {
@@ -101,37 +114,52 @@ command.list = function(so, args) {
 };
 
 command.retr = function(so, filename) {
+	var size;
 	var src = path.join(so.app.vroot, so.app.cwd, filename);
 	console.log('src:', src);
 	try {
-		var size = fs.lstatSync(src).size;
-		console.log('size:', size);
-		so.write('150 Opening BINARY mode data connection for ' +
-			src + '(' + size + ' bytes)\r\n');
+		size = fs.lstatSync(src).size;
 	} catch (err) {
-		console.error('err', err);
+		console.error('retr lstat err', err);
+		so.write('553 file error');
+		return;
 	}
 
 	var server = so.app.dil;
 	server.on('connection', function(conn) {
 		var record = conn.remoteAddress + ':' + conn.remotePort;
 		console.log('[dil] Connected: ', record);
-		
+
 		var fin = fs.createReadStream(src);
 		so.on('drain', function() {
+			console.debug('socket drain');
+
 			fin.resume();
 		});
+
 		fin.on('data', function(data) {
+			console.debug('[retr] read file data', data.toString().length);
+
 			if (!conn.write(data)) {
+				console.debug('[retr] fin pause');
 				fin.pause();
 			}
-		}).on('end', function() {
+
+		});
+
+		fin.on('end', function() {
+			console.debug('[retr] file read over');
+
 			so.write('226 Transfer complete.\r\n');
 			if (!!conn) {
 				conn.end();
 			}
 		});
-	})
+	});
+
+	console.log('size:', size);
+	so.write('150 Opening BINARY mode data connection for ' +
+		src + '(' + size + ' bytes)\r\n');
 };
 
 command.stor = function(so, args) {
