@@ -59,7 +59,7 @@ var newUser = function(so) {
 		user: '-',
 		pass: '-',
 		cwd: '/',
-		vroot: 'e:/'
+		vroot: 'f:/'
 	};
 
 	so.app.config = {
